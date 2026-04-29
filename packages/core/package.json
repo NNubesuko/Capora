@@ -1,0 +1,21 @@
+{
+  "name": "@capora/core",
+  "version": "0.0.1",
+  "description": "Type definitions, capability schema, and trace contracts for Capora",
+  "keywords": ["capora", "workflow", "orchestration", "ai", "llm", "capability", "typescript"],
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "zod": "^3.24.1"
+  }
+}

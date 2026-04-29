@@ -1,0 +1,22 @@
+{
+  "name": "@capora/adapter-web",
+  "version": "0.0.1",
+  "description": "Web response adapter for Capora orchestration outputs",
+  "keywords": ["capora", "workflow", "orchestration", "ai", "web", "adapter", "typescript"],
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@capora/runtime": "workspace:*",
+    "@capora/ui-contracts": "workspace:*"
+  }
+}

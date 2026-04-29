@@ -1,0 +1,26 @@
+{
+  "name": "@capora/runtime",
+  "version": "0.0.1",
+  "description": "Orchestration engine, planners, and session management for Capora",
+  "keywords": ["capora", "workflow", "orchestration", "ai", "llm", "planner", "openai", "bedrock", "typescript"],
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.1029.0",
+    "@capora/core": "workspace:*",
+    "uuid": "^13.0.0",
+    "zod": "^3.24.1"
+  }
+}

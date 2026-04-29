@@ -1,0 +1,21 @@
+{
+  "name": "@capora/ui-contracts",
+  "version": "0.0.1",
+  "description": "TypeScript interfaces for Capora web UI components",
+  "keywords": ["capora", "workflow", "orchestration", "ai", "ui", "typescript"],
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@capora/runtime": "workspace:*"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "@capora/sdk",
+  "version": "0.0.1",
+  "description": "Public SDK for building AI-native workflow orchestration with Capora",
+  "keywords": ["capora", "workflow", "orchestration", "ai", "llm", "sdk", "capability", "typescript"],
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@capora/core": "workspace:*",
+    "@capora/runtime": "workspace:*"
+  }
+}
