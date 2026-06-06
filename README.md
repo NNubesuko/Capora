@@ -148,18 +148,35 @@ import { defineCapability } from "@capora/sdk";
 export const createInvoiceDraft = defineCapability({
   name: "invoice.createDraft",
   description: "Create a draft invoice for a customer",
-  input: z.object({
+  version: "1.0.0",
+  sideEffect: "write",
+  approval: {
+    required: false
+  },
+  audit: {
+    recordInput: true,
+    recordOutput: true
+  },
+  idempotency: {
+    required: true,
+    keyFields: ["customerId", "description"]
+  },
+  inputSchema: z.object({
     customerId: z.string(),
     amount: z.number(),
     currency: z.string(),
-    description: z.string(),
+    description: z.string()
   }),
-  approval: { required: false },
-  idempotent: true,
-  sideEffect: "low",
-  handler: async ({ input }) => {
-    return { invoiceId: "inv_123", status: "draft" };
-  },
+  run: async ({ customerId, amount, currency, description }) => {
+    return {
+      invoiceId: "inv_123",
+      customerId,
+      amount,
+      currency,
+      description,
+      status: "draft"
+    };
+  }
 });
 ```
 
@@ -506,18 +523,35 @@ import { defineCapability } from "@capora/sdk";
 export const createInvoiceDraft = defineCapability({
   name: "invoice.createDraft",
   description: "顧客向けの請求書ドラフトを作成する",
-  input: z.object({
+  version: "1.0.0",
+  sideEffect: "write",
+  approval: {
+    required: false
+  },
+  audit: {
+    recordInput: true,
+    recordOutput: true
+  },
+  idempotency: {
+    required: true,
+    keyFields: ["customerId", "description"]
+  },
+  inputSchema: z.object({
     customerId: z.string(),
     amount: z.number(),
     currency: z.string(),
-    description: z.string(),
+    description: z.string()
   }),
-  approval: { required: false },
-  idempotent: true,
-  sideEffect: "low",
-  handler: async ({ input }) => {
-    return { invoiceId: "inv_123", status: "draft" };
-  },
+  run: async ({ customerId, amount, currency, description }) => {
+    return {
+      invoiceId: "inv_123",
+      customerId,
+      amount,
+      currency,
+      description,
+      status: "draft"
+    };
+  }
 });
 ```
 

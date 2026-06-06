@@ -1,13 +1,19 @@
 export {
   defineCapability,
+  normalizeCapabilityContract,
   workflowPlanSchema,
   workflowPlanStepSchema
 } from "@capora/core";
 export type {
+  CapabilityApprovalPolicy,
+  CapabilityAuditPolicy,
   CapabilityContext,
   CapabilityExecutionRecord,
   CapabilityDefinition,
+  CapabilityIdempotencyPolicy,
+  CapabilitySideEffect,
   JsonLike,
+  NormalizedCapabilityDefinition,
   Planner,
   PlannerCapability,
   PlannerRequest,
