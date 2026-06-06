@@ -25,6 +25,7 @@ import {
   isUuid,
   isUuidV7
 } from "../dist/shared/uuid.js";
+import { normalizeCapabilityContract } from "../../core/dist/index.js";
 
 const createPlanner = (steps) => ({
   createPlan: ({ goal }) => ({
@@ -38,13 +39,15 @@ const createCapability = ({
   description = name,
   inputSchema,
   requiresApproval = false,
-  run
+  run,
+  ...contract
 }) => ({
   name,
   description,
   inputSchema,
   requiresApproval,
-  run
+  run,
+  ...contract
 });
 
 const createRuntime = ({
@@ -93,6 +96,73 @@ const createOpenAIFetchResponse = (payload, ok = true) =>
       requestBody: init?.body
     };
   };
+
+test("normalizes capabilities that do not specify contract metadata", () => {
+  const capability = {
+    name: "customer.find",
+    description: "Find a customer",
+    inputSchema: z.object({
+      customerEmail: z.string().email()
+    }),
+    run: ({ customerEmail }) => ({
+      customerEmail
+    })
+  };
+
+  const normalized = normalizeCapabilityContract(capability);
+
+  assert.equal(normalized.version, "1.0.0");
+  assert.equal(normalized.sideEffect, "none");
+  assert.deepEqual(normalized.approval, {
+    required: false
+  });
+  assert.deepEqual(normalized.audit, {
+    recordInput: true,
+    recordOutput: true
+  });
+  assert.deepEqual(normalized.idempotency, {
+    required: false
+  });
+});
+
+test("normalizes legacy requiresApproval into approval.required", () => {
+  const capability = {
+    name: "invoice.send",
+    description: "Send an invoice",
+    inputSchema: z.object({}),
+    requiresApproval: true,
+    run: () => ({
+      status: "sent"
+    })
+  };
+
+  const normalized = normalizeCapabilityContract(capability);
+
+  assert.deepEqual(normalized.approval, {
+    required: true
+  });
+});
+
+test("uses explicit approval policy before legacy requiresApproval", () => {
+  const capability = {
+    name: "invoice.preview",
+    description: "Preview an invoice",
+    inputSchema: z.object({}),
+    requiresApproval: true,
+    approval: {
+      required: false
+    },
+    run: () => ({
+      status: "previewed"
+    })
+  };
+
+  const normalized = normalizeCapabilityContract(capability);
+
+  assert.deepEqual(normalized.approval, {
+    required: false
+  });
+});
 
 test("RuleBasedPlanner matches the representative invoice evaluation cases", async () => {
   const planner = new RuleBasedPlanner();
@@ -370,6 +440,58 @@ test("pauses for approval before executing approval-required steps", async () =>
   assert.equal(traceEvent.type, "step.awaiting_approval");
   assert.equal(traceEvent.capability, "invoice.send");
   assert.equal(traceEvent.stepIndex, 0);
+  assert.equal(traceEvent.reason, "invoice.send requires approval before execution.");
+  assert.ok(await sessionStore.get(response.sessionId));
+});
+
+test("pauses for approval when approval.required is true", async () => {
+  let executionCount = 0;
+
+  const invoiceSend = createCapability({
+    name: "invoice.send",
+    inputSchema: z.object({
+      invoiceId: z.string().min(3),
+      customerEmail: z.string().email()
+    }),
+    approval: {
+      required: true,
+      reason: "Sending an invoice is an external side effect."
+    },
+    run: ({ invoiceId, customerEmail }) => {
+      executionCount += 1;
+
+      return {
+        invoiceId,
+        customerEmail,
+        status: "sent"
+      };
+    }
+  });
+
+  const sessionStore = new InMemoryWorkflowSessionStore();
+  const { runtime } = createRuntime({
+    capabilities: [invoiceSend],
+    steps: [{ capability: "invoice.send", reason: "Send the invoice" }],
+    sessionStore
+  });
+
+  const response = await runtime.orchestrate({
+    goal: "Send the invoice",
+    providedInput: {
+      invoiceId: "inv_123",
+      customerEmail: "alice@example.com"
+    }
+  });
+
+  assert.equal(response.status, "needs_approval");
+  assert.equal(response.reason, "Sending an invoice is an external side effect.");
+  assert.equal(executionCount, 0);
+
+  const traceEvent = response.trace[response.trace.length - 1];
+  assert.equal(traceEvent.type, "step.awaiting_approval");
+  assert.equal(traceEvent.capability, "invoice.send");
+  assert.equal(traceEvent.stepIndex, 0);
+  assert.equal(traceEvent.reason, "Sending an invoice is an external side effect.");
   assert.ok(await sessionStore.get(response.sessionId));
 });
 

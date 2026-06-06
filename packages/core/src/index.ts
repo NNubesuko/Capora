@@ -1,7 +1,15 @@
 export { defineCapability } from "./capability/define-capability.js";
+export {
+  normalizeCapabilityContract,
+  type NormalizedCapabilityDefinition
+} from "./capability/normalize-capability-contract.js";
 export type {
+  CapabilityApprovalPolicy,
+  CapabilityAuditPolicy,
   CapabilityContext,
-  CapabilityDefinition
+  CapabilityDefinition,
+  CapabilityIdempotencyPolicy,
+  CapabilitySideEffect
 } from "./capability/types.js";
 export type { CapabilityExecutionRecord } from "./execution/execution-record.js";
 export type {
