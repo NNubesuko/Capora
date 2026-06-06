@@ -880,6 +880,41 @@ test("fails before execution when external_send does not require approval", asyn
   );
 });
 
+test("allows high-risk side effects when legacy requiresApproval is true", async () => {
+  let executionCount = 0;
+
+  const invoiceSend = createCapability({
+    name: "invoice.send",
+    inputSchema: z.object({
+      invoiceId: z.string().min(3)
+    }),
+    sideEffect: "external_send",
+    requiresApproval: true,
+    run: () => {
+      executionCount += 1;
+
+      return {
+        status: "sent"
+      };
+    }
+  });
+
+  const { runtime } = createRuntime({
+    capabilities: [invoiceSend],
+    steps: [{ capability: "invoice.send", reason: "Send the invoice" }]
+  });
+
+  const response = await runtime.orchestrate({
+    goal: "Send the invoice",
+    providedInput: {
+      invoiceId: "inv_123"
+    }
+  });
+
+  assert.equal(response.status, "needs_approval");
+  assert.equal(executionCount, 0);
+});
+
 test("fails before execution when delete does not specify approval", async () => {
   let executionCount = 0;
 
