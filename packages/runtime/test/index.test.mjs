@@ -440,6 +440,7 @@ test("pauses for approval before executing approval-required steps", async () =>
   assert.equal(traceEvent.type, "step.awaiting_approval");
   assert.equal(traceEvent.capability, "invoice.send");
   assert.equal(traceEvent.stepIndex, 0);
+  assert.equal(traceEvent.reason, "invoice.send requires approval before execution.");
   assert.ok(await sessionStore.get(response.sessionId));
 });
 
@@ -483,13 +484,14 @@ test("pauses for approval when approval.required is true", async () => {
   });
 
   assert.equal(response.status, "needs_approval");
-  assert.equal(response.reason, "invoice.send requires approval before execution.");
+  assert.equal(response.reason, "Sending an invoice is an external side effect.");
   assert.equal(executionCount, 0);
 
   const traceEvent = response.trace[response.trace.length - 1];
   assert.equal(traceEvent.type, "step.awaiting_approval");
   assert.equal(traceEvent.capability, "invoice.send");
   assert.equal(traceEvent.stepIndex, 0);
+  assert.equal(traceEvent.reason, "Sending an invoice is an external side effect.");
   assert.ok(await sessionStore.get(response.sessionId));
 });
 

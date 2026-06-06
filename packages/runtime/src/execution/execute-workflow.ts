@@ -85,7 +85,9 @@ export const executeWorkflow = async (
 
     if (normalizedCapability.approval.required) {
       if (!approvalGranted) {
-        const reason = `${capability.name} requires approval before execution.`;
+        const reason =
+          normalizedCapability.approval.reason ??
+          `${capability.name} requires approval before execution.`;
 
         pushTrace(state.trace, {
           type: "step.awaiting_approval",
