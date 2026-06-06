@@ -1,10 +1,16 @@
 import {
+  normalizeCapabilityContract,
   workflowPlanSchema,
   type CapabilityDefinition,
   type WorkflowPlan
 } from "@capora/core";
+import { defaultPlanSafetyPolicy } from "./safety/default-safety-policy.js";
 
 const MAX_WORKFLOW_PLAN_STEPS = 100;
+
+const approvalRequiredSideEffects = new Set(
+  defaultPlanSafetyPolicy.approvalRequiredSideEffects
+);
 
 export const validateWorkflowPlan = (
   plan: unknown,
@@ -20,8 +26,21 @@ export const validateWorkflowPlan = (
   }
 
   for (const step of parsedPlan.steps) {
-    if (!capabilityMap.has(step.capability)) {
+    const capability = capabilityMap.get(step.capability);
+
+    if (!capability) {
       throw new Error(`Planner returned unknown capability "${step.capability}".`);
+    }
+
+    const normalizedCapability = normalizeCapabilityContract(capability);
+
+    if (
+      approvalRequiredSideEffects.has(normalizedCapability.sideEffect) &&
+      !normalizedCapability.approval.required
+    ) {
+      throw new Error(
+        `Capability "${capability.name}" has sideEffect "${normalizedCapability.sideEffect}" but approval.required is not true.`
+      );
     }
   }
 

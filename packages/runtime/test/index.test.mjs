@@ -38,14 +38,14 @@ const createCapability = ({
   name,
   description = name,
   inputSchema,
-  requiresApproval = false,
+  requiresApproval,
   run,
   ...contract
 }) => ({
   name,
   description,
   inputSchema,
-  requiresApproval,
+  ...(requiresApproval === undefined ? {} : { requiresApproval }),
   run,
   ...contract
 });
@@ -405,6 +405,7 @@ test("pauses for approval before executing approval-required steps", async () =>
       invoiceId: z.string().min(3),
       customerEmail: z.string().email()
     }),
+    sideEffect: "external_send",
     requiresApproval: true,
     run: ({ invoiceId, customerEmail }) => {
       executionCount += 1;
@@ -453,6 +454,7 @@ test("pauses for approval when approval.required is true", async () => {
       invoiceId: z.string().min(3),
       customerEmail: z.string().email()
     }),
+    sideEffect: "external_send",
     approval: {
       required: true,
       reason: "Sending an invoice is an external side effect."
@@ -830,6 +832,130 @@ test("fails before execution when planner returns an unknown capability", async 
     response.trace.map((event) => event.type),
     ["goal.received", "workflow.failed"]
   );
+});
+
+test("fails before execution when external_send does not require approval", async () => {
+  let executionCount = 0;
+
+  const invoiceSend = createCapability({
+    name: "invoice.send",
+    inputSchema: z.object({
+      invoiceId: z.string().min(3)
+    }),
+    sideEffect: "external_send",
+    approval: {
+      required: false
+    },
+    run: () => {
+      executionCount += 1;
+
+      return {
+        status: "sent"
+      };
+    }
+  });
+
+  const { runtime } = createRuntime({
+    capabilities: [invoiceSend],
+    steps: [{ capability: "invoice.send", reason: "Send the invoice" }]
+  });
+
+  const response = await runtime.orchestrate({
+    goal: "Send the invoice",
+    providedInput: {
+      invoiceId: "inv_123"
+    }
+  });
+
+  assert.equal(response.status, "failed");
+  assert.equal(
+    response.error,
+    'Capability "invoice.send" has sideEffect "external_send" but approval.required is not true.'
+  );
+  assert.equal(response.results.length, 0);
+  assert.equal(executionCount, 0);
+  assert.deepEqual(
+    response.trace.map((event) => event.type),
+    ["goal.received", "workflow.failed"]
+  );
+});
+
+test("fails before execution when delete does not specify approval", async () => {
+  let executionCount = 0;
+
+  const customerDelete = createCapability({
+    name: "customer.delete",
+    inputSchema: z.object({
+      customerId: z.string().min(3)
+    }),
+    sideEffect: "delete",
+    run: () => {
+      executionCount += 1;
+
+      return {
+        status: "deleted"
+      };
+    }
+  });
+
+  const { runtime } = createRuntime({
+    capabilities: [customerDelete],
+    steps: [{ capability: "customer.delete", reason: "Delete the customer" }]
+  });
+
+  const response = await runtime.orchestrate({
+    goal: "Delete the customer",
+    providedInput: {
+      customerId: "cust_123"
+    }
+  });
+
+  assert.equal(response.status, "failed");
+  assert.equal(
+    response.error,
+    'Capability "customer.delete" has sideEffect "delete" but approval.required is not true.'
+  );
+  assert.equal(response.results.length, 0);
+  assert.equal(executionCount, 0);
+});
+
+test("allows write side effects without approval", async () => {
+  let executionCount = 0;
+
+  const customerUpdate = createCapability({
+    name: "customer.update",
+    inputSchema: z.object({
+      customerId: z.string().min(3)
+    }),
+    sideEffect: "write",
+    approval: {
+      required: false
+    },
+    run: ({ customerId }) => {
+      executionCount += 1;
+
+      return {
+        customerId,
+        status: "updated"
+      };
+    }
+  });
+
+  const { runtime } = createRuntime({
+    capabilities: [customerUpdate],
+    steps: [{ capability: "customer.update", reason: "Update the customer" }]
+  });
+
+  const response = await runtime.orchestrate({
+    goal: "Update the customer",
+    providedInput: {
+      customerId: "cust_123"
+    }
+  });
+
+  assert.equal(response.status, "completed");
+  assert.equal(response.results.length, 1);
+  assert.equal(executionCount, 1);
 });
 
 test("fails before execution when planner returns too many steps", async () => {
