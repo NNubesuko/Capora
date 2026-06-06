@@ -340,6 +340,8 @@ Planned areas include:
   - block unknown or unsafe capabilities
   - detect missing inputs before runtime
 
+Capora validates LLM-generated workflow plans before execution. It checks that every planned capability exists and that capabilities with high-risk side effects, such as `external_send`, `payment`, or `delete`, require approval before they can run.
+
 - Human Approval
   - pause before risky operations
   - resume after approval
@@ -684,6 +686,8 @@ Caporaは、安全で監査しやすいagentic workflowのためのcapability or
   - LLMが生成したplanを実行前に検証する
   - 未知または安全でないcapabilityをブロックする
   - runtime前に不足入力を検出する
+
+Caporaは、LLMが生成したworkflow planを実行前に検証します。planに含まれるcapabilityが存在することに加え、`external_send`、`payment`、`delete` のような高リスクな副作用を持つcapabilityには承認が必須であることを確認します。
 
 - Human Approval
   - リスクのある操作前に一時停止する
