@@ -1,6 +1,10 @@
 # Capora
 
-**AI-native orchestration framework for conversation-first business workflows.**
+**Lightweight capability orchestration for safe, auditable AI-driven business workflows.**
+
+Capora is not another general-purpose agent framework. Instead of letting an AI agent freely call arbitrary tools, Capora helps developers define explicit business capabilities and lets an LLM plan, ask for missing inputs, and execute only those approved capabilities.
+
+Capora is designed to work alongside agent frameworks, LLM providers, and tool protocols such as OpenAI, Amazon Bedrock, and MCP. Its focus is the business execution layer: capability contracts, workflow planning, missing input resolution, approvals, audit-friendly traces, and reproducibility.
 
 - [English](#english)
 - [日本語](#日本語)
@@ -11,71 +15,110 @@
 
 ### What is Capora
 
-**Capora** is an AI-native orchestration framework for building conversation-first business workflows.
+**Capora** is a lightweight capability orchestration framework for building safe, auditable AI-driven business workflows.
 
-Instead of forcing users to navigate complex UIs and multi-step forms, Capora lets service developers declare:
+It is not a replacement for OpenAI Agents, Amazon Bedrock Agents, LangGraph, MCP, or other agent and tool ecosystems. Capora focuses on the layer where AI-driven plans become business operations with clear contracts, controlled side effects, missing input handling, approval pauses, and traceable execution.
+
+Instead of exposing arbitrary tools to an agent, Capora lets service developers declare:
 
 - what the system can do (**capabilities**)
 - what inputs are required
 - where approval is needed
-- what must be logged
+- what execution should record
 
-From there, Capora helps AI turn a user's goal into a safe, minimal-interaction workflow.
+From there, Capora helps an LLM or agent turn a user's goal into a constrained workflow plan, collect only the missing information, pause when approval is required, and execute in-memory handlers through the capability registry.
 
 ### Why Capora
 
-Traditional SaaS products are built around screens — list screens, edit screens, settings screens, confirmation screens. But users do not actually want screens. They want outcomes.
+Modern AI agents can plan, call tools, and complete multi-step tasks. However, business applications often need more than tool calling.
 
-They want to say:
+They need:
+
+- explicit capability definitions
+- controlled side effects
+- missing input resolution
+- human approval before risky actions
+- audit-friendly execution traces
+- reproducible workflow runs
+- provider-agnostic LLM integration
+
+Capora focuses on this layer.
+
+It is useful when users want outcomes rather than screens:
 
 - "Create and send the invoice for customer A"
 - "Register a new employee"
 - "Approve this request"
 
-Capora enables developers to build systems where:
+**Capora helps structure safer AI-driven workflows around explicit business capabilities.**
 
-- a user starts with natural language
-- AI plans the workflow
-- missing information is collected only when needed
-- risky actions are gated by approval
-- execution is traceable and auditable
+### How Capora relates to Agents and MCP
 
-**Capora is a runtime for letting AI safely compose business workflows.**
+Capora is not intended to replace agent frameworks or MCP.
+
+Agent frameworks provide reasoning loops, tool calling, handoffs, memory, and runtime behavior. MCP provides a standard way for AI applications to connect to external tools and data sources.
+
+Capora sits between AI planning and business execution.
+
+```text
+Agent / LLM / MCP client
+        ↓
+Capora
+        ↓
+Business capabilities / APIs / databases / SaaS
+```
+
+Capora can use LLMs to create workflow plans, and future versions may wrap MCP tools as Capora capabilities. The goal is to make agentic workflows safer, more auditable, and easier to integrate into business applications.
+
+### Capabilities
+
+A capability is an explicit business operation that Capora is allowed to execute.
+
+Examples:
+
+- `customer.find`
+- `customer.create`
+- `invoice.createDraft`
+- `invoice.send`
+
+Unlike a raw tool call, a capability is meant to represent a business operation with a clear contract. Today, capabilities define names, descriptions, zod input schemas, approval requirements, side-effect level, idempotency, and in-memory handlers. Over time, the contract can evolve to include richer business metadata such as audit policy, capability versioning, and stronger idempotency rules.
 
 ### What Capora is not
 
 - just a chat UI
 - just an LLM wrapper
-- just an MCP server generator
+- an MCP replacement
+- a complete general-purpose agent framework
 - just a workflow automation tool
 - just a prompt library
 
-Its main job is not to talk. Its main job is to **safely execute business intent through AI-assisted orchestration**.
+Its main job is not to provide general-purpose autonomy. Its main job is to **orchestrate explicit business capabilities so LLMs and agents can plan, ask for missing inputs, and execute workflows in a safer, auditable, business-oriented way**.
 
 ### Design goals
 
 | Principle | Description |
 |---|---|
 | **Goal-first** | Users describe what they want to achieve, not which screen to open. |
-| **Capability-first** | Developers define business capabilities, not UI flows. |
+| **Capability-first** | Developers define business operations and constraints, not arbitrary tool access. |
 | **Minimal interaction** | Only ask the user for information that is actually missing. |
 | **Human control** | High-risk or irreversible actions must support approval gates. |
-| **Auditability** | Every meaningful step should be explainable and traceable. |
-| **UI-agnostic** | The same runtime works with web, Slack, voice, MCP, and future interfaces. |
+| **Auditability** | Meaningful steps should be explainable and traceable. |
+| **Provider-agnostic** | Planning can work with rule-based logic or compatible LLM providers. |
+| **Integration-friendly** | Capora is designed to sit behind web, chat, voice, agent, and future MCP-based interfaces. |
 
 ### Architecture
 
 ```text
 User
   ↓
-UI Adapter (web / chat / voice / MCP)
+UI / Agent / LLM
   ↓
 Capora Runtime
   ├─ Planner
   ├─ Missing Info Collector
   ├─ Approval Gate
   ├─ Executor
-  └─ Audit Trace
+  └─ Trace Events
   ↓
 Capability Registry
   ↓
@@ -263,6 +306,43 @@ Capora is a good fit for:
 - AI-native SaaS products
 - conversational frontends over existing business systems
 
+### Roadmap
+
+Capora is moving toward a capability orchestration layer for safe, auditable agentic workflows.
+
+Planned areas include:
+
+- Capability Contract v1
+  - side effect metadata
+  - approval metadata
+  - audit metadata
+  - idempotency metadata
+
+- Plan Validation
+  - validate LLM-generated plans before execution
+  - block unknown or unsafe capabilities
+  - detect missing inputs before runtime
+
+- Human Approval
+  - pause before risky operations
+  - resume after approval
+  - record approval decisions in traces
+
+- Audit Trace
+  - run-level and step-level traces
+  - capability version records
+  - input/output hashing or redaction
+  - trace export
+
+- Reproducibility
+  - replay from trace
+  - dry-run execution
+  - regression tests for planner behavior
+
+- MCP Integration
+  - wrap MCP tools as Capora capabilities
+  - apply Capora approval and audit policies to MCP tool calls
+
 ### Non-goals for v0
 
 - multi-agent orchestration
@@ -293,69 +373,110 @@ Apache License 2.0. See [LICENSE](./LICENSE) for the full text.
 
 ### Caporaとは
 
-**Capora** は、会話を起点とするビジネスワークフローを構築するための、AIネイティブなオーケストレーションフレームワークです。
+**Capora** は、安全で監査しやすいAI駆動のビジネスワークフローを構築するための、軽量なcapability orchestration frameworkです。
 
-複雑なUIや多段階のフォームをユーザーに操作させるのではなく、Caporaはサービス開発者が以下を宣言できるようにします。
+Caporaは、OpenAI Agents、Amazon Bedrock Agents、LangGraph、MCPなどを置き換えるものではありません。AIが作成した計画を、明確な契約、制御された副作用、不足入力の解決、承認による一時停止、追跡可能な実行を持つビジネス操作へつなぐ層に集中します。
+
+任意のtoolをagentに自由に公開するのではなく、Caporaはサービス開発者が以下を宣言できるようにします。
 
 - システムが何をできるか（**capabilities**）
 - どの入力が必要か
 - どこで承認が必要か
-- 何を記録しなければならないか
+- 実行時に何を記録するか
 
-その上で、CaporaはAIがユーザーの目標を、安全で最小限のやり取りによるワークフローへ変換できるよう支援します。
+その上で、CaporaはLLMやagentがユーザーの目標を制約されたworkflow planに変換し、不足情報だけを集め、承認が必要な箇所で一時停止し、capability registryを通じてin-memory handlerを実行できるよう支援します。
 
 ### なぜCaporaなのか
 
-従来のSaaSプロダクトは画面を中心に作られています。しかし、ユーザーが本当に欲しいのは画面ではありません。欲しいのは結果です。
+現代のAI agentは、計画を立て、toolを呼び出し、複数ステップのタスクを実行できます。しかし、ビジネスアプリケーションでは単なるtool calling以上のものが必要になることがよくあります。
+
+必要になるもの:
+
+- 明示的なcapability定義
+- 制御された副作用
+- 不足入力の解決
+- リスクのある操作前の人間による承認
+- 監査しやすい実行trace
+- 再現可能なworkflow run
+- LLM providerに依存しない統合
+
+Caporaはこの層に集中します。
+
+ユーザーが欲しいのは画面ではなく、結果です。
 
 - 「顧客Aの請求書を作って送って」
 - 「新しい従業員を登録して」
 - 「この申請を承認して」
 
-Caporaは、それを可能にするために存在します。
+**Caporaは、明示的な業務capabilityを中心に、より安全なAI駆動ワークフローを構造化するためのものです。**
 
-- ユーザーが自然言語で開始する
-- AIがワークフローを計画する
-- 足りない情報は必要になったときだけ収集される
-- リスクのある操作は承認によって制御される
-- 実行は追跡可能で監査可能である
+### Agent / MCPとの関係
 
-**Caporaは、AIが安全にビジネスワークフローを組み立てられるようにするためのランタイムです。**
+Caporaは、agent frameworkやMCPを置き換えることを目的としていません。
+
+Agent frameworkは、reasoning loop、tool calling、handoff、memory、runtime behaviorを提供します。MCPは、AIアプリケーションが外部toolやdata sourceへ接続するための標準的な方法を提供します。
+
+Caporaは、AIによる計画とビジネス実行の間に位置します。
+
+```text
+Agent / LLM / MCP client
+        ↓
+Capora
+        ↓
+Business capabilities / APIs / databases / SaaS
+```
+
+CaporaはLLMを使ってworkflow planを作成できます。将来的にはMCP toolをCapora capabilityとしてwrapする可能性があります。目的は、agentic workflowをより安全で監査しやすく、ビジネスアプリケーションへ統合しやすくすることです。
+
+### Capabilities
+
+Capabilityは、Caporaが実行を許可された明示的な業務操作です。
+
+例:
+
+- `customer.find`
+- `customer.create`
+- `invoice.createDraft`
+- `invoice.send`
+
+生のtool callとは異なり、capabilityは明確な契約を持つ業務操作を表すことを意図しています。現時点では、capabilityはname、description、zod input schema、approval requirement、side-effect level、idempotency、in-memory handlerを定義します。今後は、audit policy、capability versioning、より強いidempotency ruleなどの業務メタデータを含められるように発展させる予定です。
 
 ### Caporaではないもの
 
 - 単なるチャットUI
 - 単なるLLMラッパー
-- 単なるMCPサーバージェネレーター
+- MCPの代替
+- 完全な汎用agent framework
 - 単なるワークフロー自動化ツール
 - 単なるプロンプトライブラリ
 
-Caporaの主な役割は会話することではありません。**AI支援のオーケストレーションによってビジネス上の意図を安全に実行すること**です。
+Caporaの主な役割は、汎用的な自律性を提供することではありません。**明示的な業務capabilityをオーケストレーションし、LLMやagentがplanを作り、不足入力を確認し、より安全で監査しやすいビジネス指向のworkflowとして実行できるようにすること**です。
 
 ### 設計目標
 
 | 原則 | 内容 |
 |---|---|
 | **Goal-first** | ユーザーは、どの画面を開くかではなく、何を達成したいかを説明できるべきです。 |
-| **Capability-first** | 開発者は、UIフローではなくビジネスcapabilityを定義します。 |
+| **Capability-first** | 開発者は、任意のtool accessではなく、業務操作と制約を定義します。 |
 | **Minimal interaction** | 実際に不足している情報だけをユーザーに尋ねます。 |
 | **Human control** | 高リスクまたは取り消し不能な操作では、承認ゲートが必要です。 |
-| **Auditability** | 意味のあるすべてのステップは、説明可能で追跡可能であるべきです。 |
-| **UI-agnostic** | 同じランタイムが、Web・Slack・音声・MCP・将来のインターフェースと連携できます。 |
+| **Auditability** | 意味のあるステップは、説明可能で追跡可能であるべきです。 |
+| **Provider-agnostic** | planningはrule-based logicまたは互換性のあるLLM providerで動作できます。 |
+| **Integration-friendly** | Caporaは、Web・chat・音声・agent・将来のMCPベースinterfaceの背後に配置できるよう設計されています。 |
 
 ### アーキテクチャ
 
 ```text
 ユーザー
   ↓
-UIアダプター（web / chat / voice / MCP）
+UI / Agent / LLM
   ↓
 Capora Runtime
   ├─ Planner
   ├─ Missing Info Collector
   ├─ Approval Gate
   ├─ Executor
-  └─ Audit Trace
+  └─ Trace Events
   ↓
 Capability Registry
   ↓
@@ -512,6 +633,43 @@ Caporaは次のようなシステムに適しています。
 - CRMやケース処理
 - AIネイティブなSaaSプロダクト
 - 既存の業務システム上に載る会話型フロントエンド
+
+### ロードマップ
+
+Caporaは、安全で監査しやすいagentic workflowのためのcapability orchestration layerへ向かっています。
+
+今後の予定領域:
+
+- Capability Contract v1
+  - side effect metadata
+  - approval metadata
+  - audit metadata
+  - idempotency metadata
+
+- Plan Validation
+  - LLMが生成したplanを実行前に検証する
+  - 未知または安全でないcapabilityをブロックする
+  - runtime前に不足入力を検出する
+
+- Human Approval
+  - リスクのある操作前に一時停止する
+  - 承認後に再開する
+  - 承認判断をtraceに記録する
+
+- Audit Trace
+  - run-level / step-level trace
+  - capability version record
+  - input/output hashingまたはredaction
+  - trace export
+
+- Reproducibility
+  - traceからのreplay
+  - dry-run execution
+  - planner behaviorのregression test
+
+- MCP Integration
+  - MCP toolをCapora capabilityとしてwrapする
+  - MCP tool callにCaporaのapproval / audit policyを適用する
 
 ### 初期バージョンにおける非目標
 
