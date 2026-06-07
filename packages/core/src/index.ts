@@ -13,6 +13,14 @@ export type {
 } from "./capability/types.js";
 export type { CapabilityExecutionRecord } from "./execution/execution-record.js";
 export type {
+  AuditActor,
+  AuditApprovalDecision,
+  AuditStepStatus,
+  AuditStepTrace,
+  AuditTrace,
+  AuditTraceVersion
+} from "./audit/audit-trace.js";
+export type {
   ApprovalDecision,
   GoalReceivedTraceEvent,
   PlanCreatedTraceEvent,

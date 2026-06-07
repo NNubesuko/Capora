@@ -1,4 +1,5 @@
 export { createCapora } from "./create-capora.js";
+export { buildAuditTrace } from "./audit/build-audit-trace.js";
 export { orchestrate, resume } from "./orchestrate.js";
 export {
   InMemoryWorkflowSessionStore,
@@ -21,6 +22,7 @@ export {
   resolvePlannerFromEnvironment
 } from "./planner-from-environment.js";
 export type { CaporaRuntime, CreateCaporaOptions } from "./capora-runtime.js";
+export type { BuildAuditTraceOptions } from "./audit/build-audit-trace.js";
 export type {
   ApprovalDecisionInput,
   OrchestrateRequest,

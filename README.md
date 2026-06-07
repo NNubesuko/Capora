@@ -286,6 +286,23 @@ Every turn produces structured trace events:
 
 `goal.received` → `plan.created` → `step.entered` → `step.awaiting_input` → `step.resumed` → `step.approved` → `step.executed` → `step.completed` → `workflow.completed`
 
+### Audit Trace export
+
+Capora can build an audit-friendly trace summary from a runtime response. The audit trace includes the workflow status, step-level capability metadata, approval decisions, side effects, and input/output hashes without storing raw input/output values by default.
+
+```ts
+import { buildAuditTrace } from "@capora/sdk";
+
+const auditTrace = buildAuditTrace({
+  response: result,
+  capabilities,
+  actor: {
+    userId: "user_123",
+    tenantId: "tenant_abc"
+  }
+});
+```
+
 ### Try the demo
 
 The consolidated `demo/` directory contains a standalone web GUI that does not require the monorepo workspace. It uses the published npm packages.
@@ -664,6 +681,23 @@ await runtime.resume({
     approved: true,
     approvedBy: "user_123",
     comment: "Invoice details confirmed."
+  }
+});
+```
+
+### Audit Trace export
+
+Caporaはruntime responseから監査向けのtrace summaryを生成できます。Audit Traceには、workflow status、stepごとのcapability metadata、承認判断、副作用、input/output hashが含まれます。raw input/outputはデフォルトでは保存しません。
+
+```ts
+import { buildAuditTrace } from "@capora/sdk";
+
+const auditTrace = buildAuditTrace({
+  response: result,
+  capabilities,
+  actor: {
+    userId: "user_123",
+    tenantId: "tenant_abc"
   }
 });
 ```

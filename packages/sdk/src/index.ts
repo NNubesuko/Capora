@@ -5,6 +5,12 @@ export {
   workflowPlanStepSchema
 } from "@capora/core";
 export type {
+  AuditActor,
+  AuditApprovalDecision,
+  AuditStepStatus,
+  AuditStepTrace,
+  AuditTrace,
+  AuditTraceVersion,
   CapabilityApprovalPolicy,
   CapabilityAuditPolicy,
   CapabilityContext,
@@ -32,6 +38,7 @@ export {
   createCaporaFromEnvironment,
   createPlannerFromEnvironment,
   createStructuredOutputModelFromEnvironment,
+  buildAuditTrace,
   createCapora,
   orchestrate,
   resolvePlannerFromEnvironment,
@@ -42,6 +49,7 @@ export type {
   ApprovalResponse,
   BedrockConverseClient,
   BedrockConverseStructuredOutputModelOptions,
+  BuildAuditTraceOptions,
   CaporaRuntime,
   CompletedState,
   CreateCaporaFromEnvironmentOptions,

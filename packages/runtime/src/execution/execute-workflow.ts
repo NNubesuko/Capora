@@ -74,6 +74,7 @@ export const executeWorkflow = async (
 
       return {
         status: "needs_input",
+        traceId: state.traceId,
         sessionId,
         plan: state.plan,
         pendingStep: step,
@@ -108,6 +109,7 @@ export const executeWorkflow = async (
 
         return {
           status: "needs_approval",
+          traceId: state.traceId,
           sessionId,
           plan: state.plan,
           pendingStep: step,
