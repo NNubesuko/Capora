@@ -13,14 +13,17 @@ export type {
 } from "./capability/types.js";
 export type { CapabilityExecutionRecord } from "./execution/execution-record.js";
 export type {
+  ApprovalDecision,
   GoalReceivedTraceEvent,
   PlanCreatedTraceEvent,
+  StepApprovedTraceEvent,
   StepAwaitingApprovalTraceEvent,
   StepAwaitingInputTraceEvent,
   StepCompletedTraceEvent,
   StepEnteredTraceEvent,
   StepExecutedTraceEvent,
   StepFailedTraceEvent,
+  StepRejectedTraceEvent,
   StepResumedTraceEvent,
   TraceEvent,
   TraceEventBase,

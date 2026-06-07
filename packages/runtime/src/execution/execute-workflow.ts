@@ -1,4 +1,5 @@
 import type {
+  ApprovalDecision,
   CapabilityContext,
   CapabilityDefinition,
   JsonLike
@@ -12,6 +13,7 @@ import { buildEffectiveInput } from "../input/build-effective-input.js";
 import { getMissingRequiredFields } from "../input/get-missing-required-fields.js";
 import { persistPausedSession } from "../session/persist-paused-session.js";
 import { setRecordValue } from "../shared/safe-record.js";
+import { deleteSessionIfPresent } from "../session/delete-session-if-present.js";
 import { failWorkflow } from "./fail-workflow.js";
 import { pushStepProgressTrace, pushTrace } from "../trace/push-trace.js";
 
@@ -20,9 +22,9 @@ export const executeWorkflow = async (
   capabilityMap: Map<string, CapabilityDefinition<any, any>>,
   sessionStore: WorkflowSessionStore,
   inputAliases: InputAliases | undefined,
-  approved: boolean
+  approvalDecision?: ApprovalDecision
 ): Promise<OrchestrationResponse> => {
-  let approvalGranted = approved;
+  let pendingApprovalDecision = approvalDecision;
 
   for (let stepIndex = state.pendingStepIndex; stepIndex < state.plan.steps.length; stepIndex += 1) {
     const step = state.plan.steps[stepIndex];
@@ -84,7 +86,7 @@ export const executeWorkflow = async (
     const normalizedCapability = normalizeCapabilityContract(capability);
 
     if (normalizedCapability.approval.required) {
-      if (!approvalGranted) {
+      if (!pendingApprovalDecision) {
         const reason =
           normalizedCapability.approval.reason ??
           `${capability.name} requires approval before execution.`;
@@ -115,7 +117,52 @@ export const executeWorkflow = async (
         };
       }
 
-      approvalGranted = false;
+      if (!pendingApprovalDecision.approved) {
+        const error = "Approval was rejected.";
+
+        pushTrace(state.trace, {
+          type: "step.rejected",
+          message: `Rejected ${capability.name}`,
+          capability: capability.name,
+          stepIndex,
+          rejectedBy: pendingApprovalDecision.approvedBy,
+          reason: pendingApprovalDecision.reason,
+          comment: pendingApprovalDecision.comment
+        });
+
+        pushTrace(state.trace, {
+          type: "workflow.failed",
+          message: `Workflow failed during ${capability.name}: ${error}`,
+          error,
+          capability: capability.name,
+          stepIndex
+        });
+
+        await deleteSessionIfPresent(sessionStore, state.sessionId);
+
+        return {
+          status: "failed",
+          traceId: state.traceId,
+          plan: state.plan,
+          results: state.results,
+          error,
+          failedStep: step,
+          capability: capability.name,
+          trace: state.trace
+        };
+      }
+
+      pushTrace(state.trace, {
+        type: "step.approved",
+        message: `Approved ${capability.name}`,
+        capability: capability.name,
+        stepIndex,
+        approvedBy: pendingApprovalDecision.approvedBy,
+        reason: pendingApprovalDecision.reason,
+        comment: pendingApprovalDecision.comment
+      });
+
+      pendingApprovalDecision = undefined;
     }
 
     try {

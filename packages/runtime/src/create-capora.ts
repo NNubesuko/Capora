@@ -1,11 +1,16 @@
 import type {
+  ApprovalDecision,
   CapabilityDefinition,
   PlannerCapability,
   TraceEvent,
   WorkflowPlan
 } from "@capora/core";
 import type { CaporaRuntime, CreateCaporaOptions } from "./capora-runtime.js";
-import type { OrchestrateRequest, ResumeRequest } from "./dto/orchestrate-request.js";
+import type {
+  ApprovalDecisionInput,
+  OrchestrateRequest,
+  ResumeRequest
+} from "./dto/orchestrate-request.js";
 import type { OrchestrationResponse } from "./dto/orchestrate-response.js";
 import { executeWorkflow } from "./execution/execute-workflow.js";
 import { validateWorkflowPlan } from "./plan-validation.js";
@@ -31,6 +36,43 @@ const createPlannerCapabilities = (
     name: capability.name,
     description: capability.description
   }));
+
+const hasOwn = (value: object, key: PropertyKey): boolean =>
+  Object.prototype.hasOwnProperty.call(value, key);
+
+const createApprovalDecision = (
+  approval: ApprovalDecisionInput
+): ApprovalDecision => ({
+  approved: approval.approved,
+  approvedBy: approval.approvedBy,
+  reason: approval.reason,
+  comment: approval.comment,
+  decidedAt: new Date().toISOString()
+});
+
+const createLegacyApprovalDecision = (approved: boolean): ApprovalDecision => ({
+  approved,
+  decidedAt: new Date().toISOString()
+});
+
+const resolveResumeApprovalDecision = (
+  request: ResumeRequest
+): ApprovalDecision | undefined => {
+  if (request.approval) {
+    return createApprovalDecision(request.approval);
+  }
+
+  if (hasOwn(request, "approved")) {
+    return createLegacyApprovalDecision(request.approved === true);
+  }
+
+  return undefined;
+};
+
+const resolveOrchestrateApprovalDecision = (
+  request: OrchestrateRequest
+): ApprovalDecision | undefined =>
+  request.approved === true ? createLegacyApprovalDecision(true) : undefined;
 
 const createPlanningFailureResponse = (
   request: OrchestrateRequest,
@@ -123,7 +165,9 @@ const resumeWorkflow = async (
     capabilityMap,
     sessionStore,
     options.inputAliases,
-    session.status === "awaiting_approval" && request.approved === true
+    session.status === "awaiting_approval"
+      ? resolveResumeApprovalDecision(request)
+      : undefined
   );
 };
 
@@ -183,7 +227,7 @@ export const createCapora = (options: CreateCaporaOptions): CaporaRuntime => {
         capabilityMap,
         sessionStore,
         options.inputAliases,
-        request.approved === true
+        resolveOrchestrateApprovalDecision(request)
       );
     },
     resume: (request: ResumeRequest): Promise<OrchestrationResponse> =>
