@@ -325,7 +325,7 @@ const replaySummary = replayReproducibilityPack(pack);
 
 ### Try the demo
 
-The consolidated `demo/` directory contains a standalone web GUI that does not require the monorepo workspace. It uses the published npm packages.
+The consolidated `demo/` directory contains a standalone web GUI for local development. In this repository, it links to the local workspace packages so the demo always reflects the current source.
 
 ```bash
 cd demo
@@ -333,6 +333,8 @@ cp .env.example .env   # configure LLM provider if desired
 pnpm install
 pnpm dev               # API on :3031, web UI on :5173
 ```
+
+The demo web app uses the workflow API endpoints `POST /workflow/orchestrate` and `POST /workflow/resume`. Each response includes the runtime response, Audit Trace, Reproducibility Pack, and Dry Replay Summary, and the Developer view shows each JSON payload in its own section.
 
 Open `http://localhost:5173` and try:
 
@@ -744,7 +746,7 @@ const replaySummary = replayReproducibilityPack(pack);
 
 ### デモの試し方
 
-統合された `demo/` ディレクトリは、モノレポのワークスペースに依存しないスタンドアロンのWebデモです。npmパッケージを使用します。
+統合された `demo/` ディレクトリは、ローカル開発用のWebデモです。このリポジトリ内ではlocal workspace packagesにリンクするため、現在のsource内容がそのままdemoに反映されます。
 
 ```bash
 cd demo
@@ -752,6 +754,8 @@ cp .env.example .env   # LLMプランナーを使う場合は設定する
 pnpm install
 pnpm dev               # API: :3031、Web UI: :5173
 ```
+
+demo Web appはworkflow API endpoint `POST /workflow/orchestrate` と `POST /workflow/resume` を使います。各responseにはruntime response、Audit Trace、Reproducibility Pack、Dry Replay Summaryが含まれ、Developer viewではそれぞれのJSONを別セクションで確認できます。
 
 ブラウザで `http://localhost:5173` を開き、次のように入力してみてください。
 

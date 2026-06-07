@@ -5,6 +5,7 @@ import {
   type CapabilitySnapshot,
   type ReproducibilityPack
 } from "@capora/core";
+import type { AuditTrace } from "@capora/core";
 import { buildAuditTrace } from "../audit/build-audit-trace.js";
 import type { OrchestrationResponse } from "../dto/orchestrate-response.js";
 import { stableJsonHash } from "../shared/stable-hash.js";
@@ -13,6 +14,12 @@ export type BuildReproducibilityPackOptions = {
   response: OrchestrationResponse;
   capabilities: CapabilityDefinition<any, any>[];
   actor?: AuditActor;
+};
+
+export const createAuditTraceHashInput = (auditTrace: AuditTrace): Omit<AuditTrace, "exportedAt"> => {
+  const { exportedAt, ...hashInput } = auditTrace;
+
+  return hashInput;
 };
 
 const snapshotCapability = (
@@ -67,7 +74,7 @@ export const buildReproducibilityPack = (
     auditTrace,
     capabilitySnapshots,
     hashes: {
-      auditTraceHash: stableJsonHash(auditTrace),
+      auditTraceHash: stableJsonHash(createAuditTraceHashInput(auditTrace)),
       capabilitySnapshotsHash: stableJsonHash(capabilitySnapshots)
     },
     createdAt: auditTrace.createdAt,

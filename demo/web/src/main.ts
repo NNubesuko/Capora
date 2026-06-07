@@ -1,4 +1,10 @@
 import { toWebResponse } from "@capora/adapter-web";
+import type {
+  AuditTrace,
+  OrchestrationResponse,
+  ReplaySummary,
+  ReproducibilityPack
+} from "@capora/sdk";
 
 interface ConversationMessage {
   role: "user" | "system";
@@ -6,8 +12,15 @@ interface ConversationMessage {
   body: string;
 }
 
-type RuntimeResponse = Parameters<typeof toWebResponse>[0];
+type RuntimeResponse = OrchestrationResponse;
 type UiResponseModel = ReturnType<typeof toWebResponse>;
+
+type DemoWorkflowResponse = {
+  runtime: RuntimeResponse;
+  auditTrace: AuditTrace;
+  reproducibilityPack: ReproducibilityPack;
+  replaySummary: ReplaySummary;
+};
 
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) throw new Error("App root not found");
@@ -261,7 +274,7 @@ app.innerHTML = `
 
     .message pre,
     .result pre,
-    #raw {
+    .developer-section pre {
       margin: 0;
       overflow-x: auto;
       white-space: pre-wrap;
@@ -407,6 +420,40 @@ app.innerHTML = `
       list-style: none;
     }
 
+    .developer-grid {
+      display: grid;
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    .developer-section {
+      display: grid;
+      gap: 10px;
+      padding: 16px;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.68);
+    }
+
+    .developer-section h3 {
+      font-size: 0.92rem;
+    }
+
+    .warning-list {
+      display: grid;
+      gap: 8px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .warning-list li {
+      padding: 10px 12px;
+      border-radius: 14px;
+      color: var(--warning);
+      background: rgba(154, 107, 16, 0.12);
+    }
+
     @media (max-width: 860px) {
       .hero-grid,
       .dashboard {
@@ -480,7 +527,32 @@ app.innerHTML = `
 
       <details class="card span-2">
         <summary>Developer view</summary>
-        <pre id="raw"></pre>
+        <div class="developer-grid">
+          <section class="developer-section">
+            <h3>Runtime Response</h3>
+            <pre id="runtime-raw"></pre>
+          </section>
+
+          <section class="developer-section">
+            <h3>Audit Trace</h3>
+            <pre id="audit-trace-raw"></pre>
+          </section>
+
+          <section class="developer-section">
+            <h3>Reproducibility Pack</h3>
+            <pre id="reproducibility-pack-raw"></pre>
+          </section>
+
+          <section class="developer-section">
+            <h3>Dry Replay Warnings</h3>
+            <div id="replay-warnings"></div>
+          </section>
+
+          <section class="developer-section">
+            <h3>Dry Replay Summary</h3>
+            <pre id="replay-summary-raw"></pre>
+          </section>
+        </div>
       </details>
     </section>
   </main>
@@ -495,7 +567,11 @@ const nextActionPanel = document.querySelector<HTMLElement>("#next-action");
 const planPanel = document.querySelector<HTMLElement>("#plan");
 const resultsPanel = document.querySelector<HTMLElement>("#results");
 const tracePanel = document.querySelector<HTMLElement>("#trace");
-const rawPanel = document.querySelector<HTMLElement>("#raw");
+const runtimeRawPanel = document.querySelector<HTMLElement>("#runtime-raw");
+const auditTraceRawPanel = document.querySelector<HTMLElement>("#audit-trace-raw");
+const reproducibilityPackRawPanel = document.querySelector<HTMLElement>("#reproducibility-pack-raw");
+const replayWarningsPanel = document.querySelector<HTMLElement>("#replay-warnings");
+const replaySummaryRawPanel = document.querySelector<HTMLElement>("#replay-summary-raw");
 
 if (
   !goalInput ||
@@ -507,13 +583,18 @@ if (
   !planPanel ||
   !resultsPanel ||
   !tracePanel ||
-  !rawPanel
+  !runtimeRawPanel ||
+  !auditTraceRawPanel ||
+  !reproducibilityPackRawPanel ||
+  !replayWarningsPanel ||
+  !replaySummaryRawPanel
 ) {
   throw new Error("Missing required UI elements");
 }
 
 let activeSessionId: string | null = null;
 let currentUi: UiResponseModel | null = null;
+let currentWorkflowResponse: DemoWorkflowResponse | null = null;
 let conversation: ConversationMessage[] = [];
 let busy = false;
 
@@ -552,10 +633,10 @@ const createClientFailureResponse = (message: string): RuntimeResponse => ({
   trace: []
 });
 
-const postRuntimeRequest = async (
-  path: "/orchestrate" | "/resume",
+const postWorkflowRequest = async (
+  path: "/workflow/orchestrate" | "/workflow/resume",
   body: Record<string, unknown>
-): Promise<RuntimeResponse> => {
+): Promise<DemoWorkflowResponse> => {
   const response = await fetch(`/api${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -572,7 +653,7 @@ const postRuntimeRequest = async (
     );
   }
 
-  return payload as RuntimeResponse;
+  return payload as DemoWorkflowResponse;
 };
 
 const formatInputSummary = (input: Record<string, string | number | boolean>): string =>
@@ -767,7 +848,7 @@ const renderNextAction = (): void => {
       setBusy(true);
 
       try {
-        const response = await postRuntimeRequest("/resume", {
+        const response = await postWorkflowRequest("/workflow/resume", {
           sessionId: activeSessionId,
           providedInput
         });
@@ -807,7 +888,7 @@ const renderNextAction = (): void => {
       setBusy(true);
 
       try {
-        const response = await postRuntimeRequest("/resume", {
+        const response = await postWorkflowRequest("/workflow/resume", {
           sessionId: activeSessionId,
           approved: true
         });
@@ -944,7 +1025,28 @@ const renderTrace = (): void => {
 };
 
 const renderRaw = (): void => {
-  rawPanel.textContent = currentUi ? formatJson(currentUi) : "";
+  runtimeRawPanel.textContent = currentWorkflowResponse
+    ? formatJson(currentWorkflowResponse.runtime)
+    : "";
+  auditTraceRawPanel.textContent = currentWorkflowResponse
+    ? formatJson(currentWorkflowResponse.auditTrace)
+    : "";
+  reproducibilityPackRawPanel.textContent = currentWorkflowResponse
+    ? formatJson(currentWorkflowResponse.reproducibilityPack)
+    : "";
+  replaySummaryRawPanel.textContent = currentWorkflowResponse
+    ? formatJson(currentWorkflowResponse.replaySummary)
+    : "";
+
+  const warnings: string[] = currentWorkflowResponse?.replaySummary.warnings ?? [];
+  replayWarningsPanel.innerHTML =
+    warnings.length > 0
+      ? `
+        <ul class="warning-list">
+          ${warnings.map((warning) => `<li>${escapeHtml(warning)}</li>`).join("")}
+        </ul>
+      `
+      : `<div class="empty">No dry replay warnings yet.</div>`;
 };
 
 const render = (): void => {
@@ -957,20 +1059,26 @@ const render = (): void => {
   renderRaw();
 };
 
-const applyResponse = (response: RuntimeResponse): void => {
-  currentUi = toWebResponse(response);
+const applyResponse = (response: DemoWorkflowResponse): void => {
+  currentWorkflowResponse = response;
+  currentUi = toWebResponse(response.runtime);
   activeSessionId = currentUi.sessionId ?? null;
   addConversationMessage("system", currentUi.stateLabel, describeSystemTurn(currentUi));
   render();
 };
 
 const applyClientFailure = (error: unknown): void => {
-  applyResponse(createClientFailureResponse(toErrorMessage(error)));
+  currentWorkflowResponse = null;
+  currentUi = toWebResponse(createClientFailureResponse(toErrorMessage(error)));
+  activeSessionId = null;
+  addConversationMessage("system", currentUi.stateLabel, describeSystemTurn(currentUi));
+  render();
 };
 
 const resetWorkflow = (): void => {
   activeSessionId = null;
   currentUi = null;
+  currentWorkflowResponse = null;
   conversation = [];
   render();
 };
@@ -986,7 +1094,7 @@ runButton.addEventListener("click", async () => {
   setBusy(true);
 
   try {
-    const response = await postRuntimeRequest("/orchestrate", {
+    const response = await postWorkflowRequest("/workflow/orchestrate", {
       goal: goalInput.value.trim()
     });
 

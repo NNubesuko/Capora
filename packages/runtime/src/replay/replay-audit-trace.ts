@@ -1,4 +1,5 @@
 import type { AuditTrace, ReproducibilityPack } from "@capora/core";
+import { createAuditTraceHashInput } from "./build-reproducibility-pack.js";
 import { stableJsonHash } from "../shared/stable-hash.js";
 
 export type ReplayStepSummary = {
@@ -98,7 +99,10 @@ export const replayReproducibilityPack = (
   const replaySummary = replayAuditTrace(pack.auditTrace);
   const warnings = [...replaySummary.warnings];
 
-  if (stableJsonHash(pack.auditTrace) !== pack.hashes.auditTraceHash) {
+  if (
+    stableJsonHash(createAuditTraceHashInput(pack.auditTrace)) !==
+    pack.hashes.auditTraceHash
+  ) {
     warnings.push("Reproducibility pack auditTraceHash does not match auditTrace.");
   }
 

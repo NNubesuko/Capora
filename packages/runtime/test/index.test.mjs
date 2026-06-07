@@ -1238,6 +1238,188 @@ test("dry replay does not execute capability run handlers", () => {
   assert.equal(packSummary.steps[0].capability, "invoice.send");
 });
 
+test("reproducibility pack audit trace hash ignores exportedAt", () => {
+  const invoiceSend = createCapability({
+    name: "invoice.send",
+    description: "Send an invoice",
+    inputSchema: z.object({
+      invoiceId: z.string().min(3)
+    }),
+    sideEffect: "external_send",
+    approval: {
+      required: true
+    },
+    run: ({ invoiceId }) => ({
+      invoiceId,
+      status: "sent"
+    })
+  });
+  const response = {
+    status: "completed",
+    traceId: "trace_hash",
+    plan: {
+      goal: "Send the invoice",
+      steps: [
+        {
+          capability: "invoice.send",
+          reason: "Send the invoice"
+        }
+      ]
+    },
+    results: [
+      {
+        capability: "invoice.send",
+        input: {
+          invoiceId: "inv_123"
+        },
+        output: {
+          status: "sent"
+        }
+      }
+    ],
+    trace: [
+      {
+        type: "goal.received",
+        message: "Received user goal",
+        goal: "Send the invoice",
+        at: "2026-04-12T00:00:00.000Z"
+      },
+      {
+        type: "plan.created",
+        message: "Generated workflow plan",
+        stepCount: 1,
+        capabilities: ["invoice.send"],
+        at: "2026-04-12T00:00:01.000Z"
+      },
+      {
+        type: "step.entered",
+        message: "Entered invoice.send",
+        capability: "invoice.send",
+        stepIndex: 0,
+        at: "2026-04-12T00:00:02.000Z"
+      },
+      {
+        type: "step.completed",
+        message: "Completed invoice.send",
+        capability: "invoice.send",
+        stepIndex: 0,
+        at: "2026-04-12T00:00:03.000Z"
+      },
+      {
+        type: "workflow.completed",
+        message: "Workflow completed",
+        resultCount: 1,
+        at: "2026-04-12T00:00:04.000Z"
+      }
+    ]
+  };
+
+  const firstPack = buildReproducibilityPack({
+    response,
+    capabilities: [invoiceSend]
+  });
+  const secondPack = buildReproducibilityPack({
+    response,
+    capabilities: [invoiceSend]
+  });
+
+  secondPack.auditTrace.exportedAt = "2099-01-01T00:00:00.000Z";
+
+  assert.equal(
+    firstPack.hashes.auditTraceHash,
+    secondPack.hashes.auditTraceHash
+  );
+});
+
+test("dry replay hash validation ignores audit trace exportedAt", () => {
+  const invoiceSend = createCapability({
+    name: "invoice.send",
+    description: "Send an invoice",
+    inputSchema: z.object({
+      invoiceId: z.string().min(3)
+    }),
+    run: ({ invoiceId }) => ({
+      invoiceId,
+      status: "sent"
+    })
+  });
+  const response = {
+    status: "completed",
+    traceId: "trace_replay_hash",
+    plan: {
+      goal: "Send the invoice",
+      steps: [
+        {
+          capability: "invoice.send",
+          reason: "Send the invoice"
+        }
+      ]
+    },
+    results: [
+      {
+        capability: "invoice.send",
+        input: {
+          invoiceId: "inv_123"
+        },
+        output: {
+          status: "sent"
+        }
+      }
+    ],
+    trace: [
+      {
+        type: "goal.received",
+        message: "Received user goal",
+        goal: "Send the invoice",
+        at: "2026-04-12T00:00:00.000Z"
+      },
+      {
+        type: "plan.created",
+        message: "Generated workflow plan",
+        stepCount: 1,
+        capabilities: ["invoice.send"],
+        at: "2026-04-12T00:00:01.000Z"
+      },
+      {
+        type: "step.entered",
+        message: "Entered invoice.send",
+        capability: "invoice.send",
+        stepIndex: 0,
+        at: "2026-04-12T00:00:02.000Z"
+      },
+      {
+        type: "step.completed",
+        message: "Completed invoice.send",
+        capability: "invoice.send",
+        stepIndex: 0,
+        at: "2026-04-12T00:00:03.000Z"
+      },
+      {
+        type: "workflow.completed",
+        message: "Workflow completed",
+        resultCount: 1,
+        at: "2026-04-12T00:00:04.000Z"
+      }
+    ]
+  };
+
+  const pack = buildReproducibilityPack({
+    response,
+    capabilities: [invoiceSend]
+  });
+
+  pack.auditTrace.exportedAt = "2099-01-01T00:00:00.000Z";
+
+  const summary = replayReproducibilityPack(pack);
+
+  assert.equal(
+    summary.warnings.some((warning) =>
+      warning.includes("auditTraceHash does not match")
+    ),
+    false
+  );
+});
+
 test("dry replay summarizes rejected approval workflows", async () => {
   const invoiceSend = createCapability({
     name: "invoice.send",

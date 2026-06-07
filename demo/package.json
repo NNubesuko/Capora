@@ -3,16 +3,17 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "pnpm -r --filter @capora/core --filter @capora/runtime --filter @capora/sdk --filter @capora/ui-contracts --filter @capora/adapter-web build",
     "dev": "concurrently --names api,web --prefix-colors cyan,magenta \"pnpm dev:api\" \"pnpm dev:web\"",
     "dev:api": "tsx watch api/src/server.ts",
     "dev:web": "vite web"
   },
   "dependencies": {
-    "@capora/core":         "^0.0.1",
-    "@capora/runtime":      "^0.0.1",
-    "@capora/sdk":          "^0.0.1",
-    "@capora/adapter-web":  "^0.0.1",
-    "@capora/ui-contracts": "^0.0.1",
+    "@capora/core":         "workspace:*",
+    "@capora/runtime":      "workspace:*",
+    "@capora/sdk":          "workspace:*",
+    "@capora/adapter-web":  "workspace:*",
+    "@capora/ui-contracts": "workspace:*",
     "zod": "^3.24.1"
   },
   "devDependencies": {
