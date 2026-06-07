@@ -65,6 +65,43 @@ const createRuntime = ({
   sessionStore
 });
 
+const createApprovalRequiredRuntime = () => {
+  let executionCount = 0;
+
+  const invoiceSend = createCapability({
+    name: "invoice.send",
+    inputSchema: z.object({
+      invoiceId: z.string().min(3)
+    }),
+    sideEffect: "external_send",
+    approval: {
+      required: true,
+      reason: "Sending an invoice is an external side effect."
+    },
+    run: ({ invoiceId }) => {
+      executionCount += 1;
+
+      return {
+        invoiceId,
+        status: "sent"
+      };
+    }
+  });
+
+  const sessionStore = new InMemoryWorkflowSessionStore();
+  const { runtime } = createRuntime({
+    capabilities: [invoiceSend],
+    steps: [{ capability: "invoice.send", reason: "Send the invoice" }],
+    sessionStore
+  });
+
+  return {
+    runtime,
+    sessionStore,
+    getExecutionCount: () => executionCount
+  };
+};
+
 const invoicePlannerCapabilities = [
   {
     name: "customer.create",
@@ -497,6 +534,155 @@ test("pauses for approval when approval.required is true", async () => {
   assert.ok(await sessionStore.get(response.sessionId));
 });
 
+test("legacy approved resumes approval-required workflows", async () => {
+  const { runtime, sessionStore, getExecutionCount } = createApprovalRequiredRuntime();
+
+  const firstResponse = await runtime.orchestrate({
+    goal: "Send the invoice",
+    providedInput: {
+      invoiceId: "inv_123"
+    }
+  });
+
+  assert.equal(firstResponse.status, "needs_approval");
+
+  const response = await runtime.resume({
+    sessionId: firstResponse.sessionId,
+    approved: true
+  });
+
+  assert.equal(response.status, "completed");
+  assert.equal(getExecutionCount(), 1);
+  assert.equal(await sessionStore.get(firstResponse.sessionId), undefined);
+});
+
+test("approval object resumes workflows and records approval details", async () => {
+  const { runtime, getExecutionCount } = createApprovalRequiredRuntime();
+
+  const firstResponse = await runtime.orchestrate({
+    goal: "Send the invoice",
+    providedInput: {
+      invoiceId: "inv_123"
+    }
+  });
+
+  const response = await runtime.resume({
+    sessionId: firstResponse.sessionId,
+    approval: {
+      approved: true,
+      approvedBy: "user_123",
+      comment: "Confirmed."
+    }
+  });
+
+  assert.equal(response.status, "completed");
+  assert.equal(getExecutionCount(), 1);
+
+  const approvedEvent = response.trace.find(
+    (event) => event.type === "step.approved"
+  );
+  assert.ok(approvedEvent);
+  assert.equal(approvedEvent.capability, "invoice.send");
+  assert.equal(approvedEvent.stepIndex, 0);
+  assert.equal(approvedEvent.approvedBy, "user_123");
+  assert.equal(approvedEvent.comment, "Confirmed.");
+});
+
+test("approval object takes priority over legacy approved", async () => {
+  const { runtime, getExecutionCount } = createApprovalRequiredRuntime();
+
+  const firstResponse = await runtime.orchestrate({
+    goal: "Send the invoice",
+    providedInput: {
+      invoiceId: "inv_123"
+    }
+  });
+
+  const response = await runtime.resume({
+    sessionId: firstResponse.sessionId,
+    approved: true,
+    approval: {
+      approved: false,
+      approvedBy: "user_123"
+    }
+  });
+
+  assert.equal(response.status, "failed");
+  assert.equal(response.error, "Approval was rejected.");
+  assert.equal(getExecutionCount(), 0);
+
+  const rejectedEvent = response.trace.find(
+    (event) => event.type === "step.rejected"
+  );
+  assert.ok(rejectedEvent);
+  assert.equal(rejectedEvent.rejectedBy, "user_123");
+});
+
+test("rejected approval ends the workflow without executing the capability", async () => {
+  const { runtime, sessionStore, getExecutionCount } = createApprovalRequiredRuntime();
+
+  const firstResponse = await runtime.orchestrate({
+    goal: "Send the invoice",
+    providedInput: {
+      invoiceId: "inv_123"
+    }
+  });
+
+  const response = await runtime.resume({
+    sessionId: firstResponse.sessionId,
+    approval: {
+      approved: false,
+      approvedBy: "user_123",
+      reason: "Invoice amount is wrong."
+    }
+  });
+
+  assert.equal(response.status, "failed");
+  assert.equal(response.error, "Approval was rejected.");
+  assert.equal(getExecutionCount(), 0);
+  assert.equal(await sessionStore.get(firstResponse.sessionId), undefined);
+  assert.deepEqual(
+    response.trace.map((event) => event.type),
+    [
+      "goal.received",
+      "plan.created",
+      "step.entered",
+      "step.awaiting_approval",
+      "step.resumed",
+      "step.rejected",
+      "workflow.failed"
+    ]
+  );
+
+  const rejectedEvent = response.trace[response.trace.length - 2];
+  assert.equal(rejectedEvent.type, "step.rejected");
+  assert.equal(rejectedEvent.capability, "invoice.send");
+  assert.equal(rejectedEvent.stepIndex, 0);
+  assert.equal(rejectedEvent.rejectedBy, "user_123");
+  assert.equal(rejectedEvent.reason, "Invoice amount is wrong.");
+});
+
+test("approval object can approve without an approver", async () => {
+  const { runtime, getExecutionCount } = createApprovalRequiredRuntime();
+
+  const firstResponse = await runtime.orchestrate({
+    goal: "Send the invoice",
+    providedInput: {
+      invoiceId: "inv_123"
+    }
+  });
+
+  const response = await runtime.resume({
+    sessionId: firstResponse.sessionId,
+    approval: {
+      approved: true
+    }
+  });
+
+  assert.equal(response.status, "completed");
+  assert.equal(getExecutionCount(), 1);
+});
+
 test("resumes paused workflows and completes successfully", async () => {
   const customerFind = createCapability({
     name: "customer.find",
@@ -600,6 +786,7 @@ test("resumes paused workflows and completes successfully", async () => {
       "step.entered",
       "step.awaiting_approval",
       "step.resumed",
+      "step.approved",
       "step.executed",
       "step.completed",
       "workflow.completed"

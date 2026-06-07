@@ -267,11 +267,24 @@ Runtime responses are modeled as explicit states:
 
 Paused states include a `sessionId` so callers can resume with `runtime.resume()`.
 
+Approval decisions can be provided when resuming a paused workflow. Capora records approval decisions in trace events so business workflows can show who approved or rejected a risky operation and why.
+
+```ts
+await runtime.resume({
+  sessionId,
+  approval: {
+    approved: true,
+    approvedBy: "user_123",
+    comment: "Invoice details confirmed."
+  }
+});
+```
+
 ### Trace events
 
 Every turn produces structured trace events:
 
-`goal.received` → `plan.created` → `step.entered` → `step.awaiting_input` → `step.resumed` → `step.executed` → `step.completed` → `workflow.completed`
+`goal.received` → `plan.created` → `step.entered` → `step.awaiting_input` → `step.resumed` → `step.approved` → `step.executed` → `step.completed` → `workflow.completed`
 
 ### Try the demo
 
@@ -641,6 +654,19 @@ const runtime = createCapora({
 | `failed` | 回復不能なエラー発生 |
 
 一時停止状態は `sessionId` を持ち、`runtime.resume()` で再開できます。
+
+承認待ちで一時停止したworkflowを再開する際、承認判断を渡すことができます。Caporaは承認・否認の判断をtrace eventに記録するため、誰が、なぜ、リスクのある操作を承認または否認したかを後から確認できます。
+
+```ts
+await runtime.resume({
+  sessionId,
+  approval: {
+    approved: true,
+    approvedBy: "user_123",
+    comment: "Invoice details confirmed."
+  }
+});
+```
 
 ### デモの試し方
 

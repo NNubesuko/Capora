@@ -22,6 +22,7 @@ export {
 } from "./planner-from-environment.js";
 export type { CaporaRuntime, CreateCaporaOptions } from "./capora-runtime.js";
 export type {
+  ApprovalDecisionInput,
   OrchestrateRequest,
   ResumeRequest
 } from "./dto/orchestrate-request.js";

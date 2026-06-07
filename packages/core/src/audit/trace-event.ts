@@ -5,11 +5,21 @@ export type TraceEventType =
   | "step.resumed"
   | "step.awaiting_input"
   | "step.awaiting_approval"
+  | "step.approved"
+  | "step.rejected"
   | "step.executed"
   | "step.completed"
   | "step.failed"
   | "workflow.completed"
   | "workflow.failed";
+
+export interface ApprovalDecision {
+  approved: boolean;
+  approvedBy?: string;
+  reason?: string;
+  comment?: string;
+  decidedAt: string;
+}
 
 export interface TraceEventBase<TType extends TraceEventType> {
   type: TType;
@@ -50,6 +60,22 @@ export interface StepAwaitingApprovalTraceEvent
   reason: string;
 }
 
+export interface StepApprovedTraceEvent extends TraceEventBase<"step.approved"> {
+  capability: string;
+  stepIndex: number;
+  approvedBy?: string;
+  reason?: string;
+  comment?: string;
+}
+
+export interface StepRejectedTraceEvent extends TraceEventBase<"step.rejected"> {
+  capability: string;
+  stepIndex: number;
+  rejectedBy?: string;
+  reason?: string;
+  comment?: string;
+}
+
 export interface StepExecutedTraceEvent extends TraceEventBase<"step.executed"> {
   capability: string;
   stepIndex: number;
@@ -84,6 +110,8 @@ export type TraceEvent =
   | StepResumedTraceEvent
   | StepAwaitingInputTraceEvent
   | StepAwaitingApprovalTraceEvent
+  | StepApprovedTraceEvent
+  | StepRejectedTraceEvent
   | StepExecutedTraceEvent
   | StepCompletedTraceEvent
   | StepFailedTraceEvent
