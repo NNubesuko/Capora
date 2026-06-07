@@ -286,9 +286,46 @@ Every turn produces structured trace events:
 
 `goal.received` → `plan.created` → `step.entered` → `step.awaiting_input` → `step.resumed` → `step.approved` → `step.executed` → `step.completed` → `workflow.completed`
 
+### Audit Trace export
+
+Capora can build an audit-friendly trace summary from a runtime response. The audit trace includes the workflow status, step-level capability metadata, approval decisions, side effects, and input/output hashes without storing raw input/output values by default.
+
+```ts
+import { buildAuditTrace } from "@capora/sdk";
+
+const auditTrace = buildAuditTrace({
+  response: result,
+  capabilities,
+  actor: {
+    userId: "user_123",
+    tenantId: "tenant_abc"
+  }
+});
+```
+
+### Reproducibility Pack
+
+Capora can export a reproducibility pack for a workflow run. The pack includes the audit trace, capability contract snapshots, and stable hashes so a run can be reviewed later without re-executing business capabilities.
+
+The first replay mode is dry replay: it reconstructs the workflow summary from the audit trace and never calls `capability.run`.
+
+```ts
+import {
+  buildReproducibilityPack,
+  replayReproducibilityPack
+} from "@capora/sdk";
+
+const pack = buildReproducibilityPack({
+  response: result,
+  capabilities
+});
+
+const replaySummary = replayReproducibilityPack(pack);
+```
+
 ### Try the demo
 
-The consolidated `demo/` directory contains a standalone web GUI that does not require the monorepo workspace. It uses the published npm packages.
+The consolidated `demo/` directory contains a standalone web GUI for local development. In this repository, it links to the local workspace packages so the demo always reflects the current source.
 
 ```bash
 cd demo
@@ -296,6 +333,8 @@ cp .env.example .env   # configure LLM provider if desired
 pnpm install
 pnpm dev               # API on :3031, web UI on :5173
 ```
+
+The demo web app uses the workflow API endpoints `POST /workflow/orchestrate` and `POST /workflow/resume`. Each response includes the runtime response, Audit Trace, Reproducibility Pack, and Dry Replay Summary, and the Developer view shows each JSON payload in its own section.
 
 Open `http://localhost:5173` and try:
 
@@ -668,9 +707,46 @@ await runtime.resume({
 });
 ```
 
+### Audit Trace export
+
+Caporaはruntime responseから監査向けのtrace summaryを生成できます。Audit Traceには、workflow status、stepごとのcapability metadata、承認判断、副作用、input/output hashが含まれます。raw input/outputはデフォルトでは保存しません。
+
+```ts
+import { buildAuditTrace } from "@capora/sdk";
+
+const auditTrace = buildAuditTrace({
+  response: result,
+  capabilities,
+  actor: {
+    userId: "user_123",
+    tenantId: "tenant_abc"
+  }
+});
+```
+
+### Reproducibility Pack
+
+Caporaはworkflow runの再現性パッケージをexportできます。Reproducibility Packには、Audit Trace、capability contract snapshot、安定hashが含まれるため、業務capabilityを再実行せずに過去runを後から検証できます。
+
+最初のreplay modeはdry replayです。Audit Traceからworkflow summaryを再構成しますが、`capability.run` は実行しません。
+
+```ts
+import {
+  buildReproducibilityPack,
+  replayReproducibilityPack
+} from "@capora/sdk";
+
+const pack = buildReproducibilityPack({
+  response: result,
+  capabilities
+});
+
+const replaySummary = replayReproducibilityPack(pack);
+```
+
 ### デモの試し方
 
-統合された `demo/` ディレクトリは、モノレポのワークスペースに依存しないスタンドアロンのWebデモです。npmパッケージを使用します。
+統合された `demo/` ディレクトリは、ローカル開発用のWebデモです。このリポジトリ内ではlocal workspace packagesにリンクするため、現在のsource内容がそのままdemoに反映されます。
 
 ```bash
 cd demo
@@ -678,6 +754,8 @@ cp .env.example .env   # LLMプランナーを使う場合は設定する
 pnpm install
 pnpm dev               # API: :3031、Web UI: :5173
 ```
+
+demo Web appはworkflow API endpoint `POST /workflow/orchestrate` と `POST /workflow/resume` を使います。各responseにはruntime response、Audit Trace、Reproducibility Pack、Dry Replay Summaryが含まれ、Developer viewではそれぞれのJSONを別セクションで確認できます。
 
 ブラウザで `http://localhost:5173` を開き、次のように入力してみてください。
 

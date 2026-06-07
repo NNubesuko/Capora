@@ -18,6 +18,7 @@ export type OrchestrationStatus =
 
 export interface OrchestrationStateBase<TStatus extends OrchestrationStatus> {
   status: TStatus;
+  traceId: string;
   plan: WorkflowPlan;
   trace: TraceEvent[];
 }
@@ -41,12 +42,10 @@ export interface NeedsApprovalState extends PausedOrchestrationStateBase<"needs_
 }
 
 export interface CompletedState extends OrchestrationStateBase<"completed"> {
-  traceId: string;
   results: CapabilityExecutionRecord[];
 }
 
 export interface FailedState extends OrchestrationStateBase<"failed"> {
-  traceId: string;
   results: CapabilityExecutionRecord[];
   error: string;
   failedStep?: WorkflowPlanStep;

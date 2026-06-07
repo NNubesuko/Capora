@@ -1,5 +1,12 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { createCaporaFromEnvironment, type JsonLike } from "@capora/sdk";
+import {
+  buildAuditTrace,
+  buildReproducibilityPack,
+  createCaporaFromEnvironment,
+  replayReproducibilityPack,
+  type JsonLike,
+  type OrchestrationResponse
+} from "@capora/sdk";
 import { z } from "zod";
 import { demoCapabilities } from "./capabilities.js";
 
@@ -38,6 +45,10 @@ const { runtime, plannerName, selection } = createCaporaFromEnvironment({
   env: process.env,
   capabilities: demoCapabilities
 });
+
+const demoActor = {
+  userId: "demo-user"
+};
 
 const port = Number.parseInt(
   process.env.DEMO_API_PORT ?? process.env.PORT ?? "3031",
@@ -106,6 +117,27 @@ const handleRequestError = (response: ServerResponse, error: unknown): void => {
   });
 };
 
+const buildDemoWorkflowResponse = (runtimeResponse: OrchestrationResponse) => {
+  const auditTrace = buildAuditTrace({
+    response: runtimeResponse,
+    capabilities: demoCapabilities,
+    actor: demoActor
+  });
+  const reproducibilityPack = buildReproducibilityPack({
+    response: runtimeResponse,
+    capabilities: demoCapabilities,
+    actor: demoActor
+  });
+  const replaySummary = replayReproducibilityPack(reproducibilityPack);
+
+  return {
+    runtime: runtimeResponse,
+    auditTrace,
+    reproducibilityPack,
+    replaySummary
+  };
+};
+
 const server = createServer(async (request, response) => {
   try {
     const method = request.method ?? "GET";
@@ -129,17 +161,17 @@ const server = createServer(async (request, response) => {
       return;
     }
 
-    if (method === "POST" && url.pathname === "/orchestrate") {
+    if (method === "POST" && url.pathname === "/workflow/orchestrate") {
       const requestBody = orchestrateRequestSchema.parse(await readJsonBody(request));
       const runtimeResponse = await runtime.orchestrate(requestBody);
-      sendJson(response, 200, runtimeResponse);
+      sendJson(response, 200, buildDemoWorkflowResponse(runtimeResponse));
       return;
     }
 
-    if (method === "POST" && url.pathname === "/resume") {
+    if (method === "POST" && url.pathname === "/workflow/resume") {
       const requestBody = resumeRequestSchema.parse(await readJsonBody(request));
       const runtimeResponse = await runtime.resume(requestBody);
-      sendJson(response, 200, runtimeResponse);
+      sendJson(response, 200, buildDemoWorkflowResponse(runtimeResponse));
       return;
     }
 

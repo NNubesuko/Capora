@@ -13,6 +13,14 @@ export type {
 } from "./capability/types.js";
 export type { CapabilityExecutionRecord } from "./execution/execution-record.js";
 export type {
+  AuditActor,
+  AuditApprovalDecision,
+  AuditStepStatus,
+  AuditStepTrace,
+  AuditTrace,
+  AuditTraceVersion
+} from "./audit/audit-trace.js";
+export type {
   ApprovalDecision,
   GoalReceivedTraceEvent,
   PlanCreatedTraceEvent,
@@ -39,6 +47,11 @@ export type {
   WorkflowPlan,
   WorkflowPlanStep
 } from "./plan/workflow-plan.js";
+export type {
+  CapabilitySnapshot,
+  ReproducibilityPack,
+  ReproducibilityPackVersion
+} from "./replay/reproducibility-pack.js";
 export type {
   Planner,
   PlannerCapability,
