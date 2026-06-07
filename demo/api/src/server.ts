@@ -20,10 +20,18 @@ const orchestrateRequestSchema = z.object({
   approved: z.boolean().optional()
 });
 
+const approvalDecisionInputSchema = z.object({
+  approved: z.boolean(),
+  approvedBy: z.string().optional(),
+  reason: z.string().optional(),
+  comment: z.string().optional()
+});
+
 const resumeRequestSchema = z.object({
   sessionId: z.string().trim().min(1),
   providedInput: z.record(jsonLikeSchema).optional(),
-  approved: z.boolean().optional()
+  approved: z.boolean().optional(),
+  approval: approvalDecisionInputSchema.optional()
 });
 
 const { runtime, plannerName, selection } = createCaporaFromEnvironment({

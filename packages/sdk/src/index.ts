@@ -38,6 +38,7 @@ export {
   resume
 } from "@capora/runtime";
 export type {
+  ApprovalDecisionInput,
   ApprovalResponse,
   BedrockConverseClient,
   BedrockConverseStructuredOutputModelOptions,
