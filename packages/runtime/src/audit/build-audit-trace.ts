@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import {
   normalizeCapabilityContract,
   type AuditActor,
@@ -9,6 +8,7 @@ import {
   type TraceEvent
 } from "@capora/core";
 import type { OrchestrationResponse } from "../dto/orchestrate-response.js";
+import { stableJsonHash } from "../shared/stable-hash.js";
 
 export type BuildAuditTraceOptions = {
   response: OrchestrationResponse;
@@ -18,36 +18,6 @@ export type BuildAuditTraceOptions = {
 
 const hasOwn = (value: object, key: PropertyKey): boolean =>
   Object.prototype.hasOwnProperty.call(value, key);
-
-const normalizeForStableJson = (value: unknown): unknown => {
-  if (Array.isArray(value)) {
-    return value.map((item) => normalizeForStableJson(item));
-  }
-
-  if (value !== null && typeof value === "object") {
-    const record = value as Record<string, unknown>;
-
-    return Object.keys(record)
-      .sort()
-      .reduce<Record<string, unknown>>((accumulator, key) => {
-        const normalizedValue = normalizeForStableJson(record[key]);
-
-        if (normalizedValue !== undefined) {
-          accumulator[key] = normalizedValue;
-        }
-
-        return accumulator;
-      }, {});
-  }
-
-  return value;
-};
-
-const stableHash = (value: unknown): string => {
-  const stableJson = JSON.stringify(normalizeForStableJson(value)) ?? "undefined";
-
-  return createHash("sha256").update(stableJson).digest("hex");
-};
 
 const createCapabilityMap = (
   capabilities: CapabilityDefinition<any, any>[]
@@ -203,11 +173,11 @@ const buildFromOptions = (options: BuildAuditTraceOptions): AuditTrace => {
     }
 
     if (step.inputRecorded) {
-      step.inputHash = stableHash(result.input);
+      step.inputHash = stableJsonHash(result.input);
     }
 
     if (step.outputRecorded && hasOwn(result, "output")) {
-      step.outputHash = stableHash(result.output);
+      step.outputHash = stableJsonHash(result.output);
     }
   }
 

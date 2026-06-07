@@ -48,6 +48,11 @@ export type {
   WorkflowPlanStep
 } from "./plan/workflow-plan.js";
 export type {
+  CapabilitySnapshot,
+  ReproducibilityPack,
+  ReproducibilityPackVersion
+} from "./replay/reproducibility-pack.js";
+export type {
   Planner,
   PlannerCapability,
   PlannerRequest

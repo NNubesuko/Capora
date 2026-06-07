@@ -4,6 +4,7 @@ import { z } from "zod";
 import {
   BedrockConverseStructuredOutputModel,
   buildAuditTrace,
+  buildReproducibilityPack,
   createCaporaFromEnvironment,
   createCapora,
   createPlannerFromEnvironment,
@@ -12,6 +13,8 @@ import {
   LLMPlanner,
   OpenAIResponsesPlannerModel,
   OpenAIResponsesStructuredOutputModel,
+  replayAuditTrace,
+  replayReproducibilityPack,
   resolvePlannerFromEnvironment,
   RuleBasedPlanner
 } from "../dist/index.js";
@@ -928,6 +931,418 @@ test("audit trace records input and output hashes without raw values", async () 
   assert.equal("output" in step, false);
   assert.equal(serializedAuditTrace.includes("input-secret-memo"), false);
   assert.equal(serializedAuditTrace.includes("output-secret-token"), false);
+});
+
+test("builds reproducibility pack for a completed approval workflow", async () => {
+  const customerFind = createCapability({
+    name: "customer.find",
+    description: "Find a customer",
+    inputSchema: z.object({
+      customerEmail: z.string().email()
+    }),
+    run: ({ customerEmail }) => ({
+      customerId: "cust_123",
+      customerEmail
+    })
+  });
+
+  const invoiceCreateDraft = createCapability({
+    name: "invoice.createDraft",
+    description: "Create an invoice draft",
+    inputSchema: z.object({
+      customerId: z.string().min(3),
+      amount: z.number().positive()
+    }),
+    sideEffect: "write",
+    run: ({ customerId, amount }) => ({
+      invoiceId: "inv_123",
+      customerId,
+      amount
+    })
+  });
+
+  const invoiceSend = createCapability({
+    name: "invoice.send",
+    description: "Send an invoice",
+    version: "1.0.0",
+    inputSchema: z.object({
+      invoiceId: z.string().min(3),
+      customerEmail: z.string().email()
+    }),
+    sideEffect: "external_send",
+    approval: {
+      required: true,
+      reason: "Sending an invoice is an external side effect."
+    },
+    run: ({ invoiceId, customerEmail }) => ({
+      invoiceId,
+      customerEmail,
+      status: "sent"
+    })
+  });
+
+  const capabilities = [customerFind, invoiceCreateDraft, invoiceSend];
+  const { runtime } = createRuntime({
+    capabilities,
+    steps: [
+      { capability: "customer.find", reason: "Find the customer first" },
+      { capability: "invoice.createDraft", reason: "Create the invoice draft" },
+      { capability: "invoice.send", reason: "Send the invoice" }
+    ]
+  });
+
+  const firstResponse = await runtime.orchestrate({
+    goal: "Send the invoice",
+    providedInput: {
+      customerEmail: "alice@example.com",
+      amount: 2500
+    }
+  });
+  const response = await runtime.resume({
+    sessionId: firstResponse.sessionId,
+    approval: {
+      approved: true,
+      approvedBy: "user_123"
+    }
+  });
+
+  const pack = buildReproducibilityPack({
+    response,
+    capabilities,
+    actor: {
+      userId: "user_123"
+    }
+  });
+
+  assert.equal(pack.version, "1.0");
+  assert.equal(pack.status, "completed");
+  assert.equal(pack.traceId, response.traceId);
+  assert.equal(pack.goal, "Send the invoice");
+  assert.equal(pack.auditTrace.status, "completed");
+  assert.equal(pack.capabilitySnapshots.length, 3);
+  assert.match(pack.hashes.auditTraceHash, /^[a-f0-9]{64}$/);
+  assert.match(pack.hashes.capabilitySnapshotsHash, /^[a-f0-9]{64}$/);
+  assert.ok(pack.createdAt);
+  assert.ok(pack.exportedAt);
+});
+
+test("reproducibility pack excludes raw input and output values", async () => {
+  const invoiceCreateDraft = createCapability({
+    name: "invoice.createDraft",
+    description: "Create an invoice draft",
+    inputSchema: z.object({
+      customerEmail: z.string().email(),
+      secretMemo: z.string()
+    }),
+    audit: {
+      recordInput: true,
+      recordOutput: true
+    },
+    run: ({ customerEmail }) => ({
+      invoiceId: "inv_123",
+      customerEmail,
+      providerToken: "output-secret-token"
+    })
+  });
+
+  const { runtime } = createRuntime({
+    capabilities: [invoiceCreateDraft],
+    steps: [{ capability: "invoice.createDraft", reason: "Create the invoice draft" }]
+  });
+
+  const response = await runtime.orchestrate({
+    goal: "Create an invoice draft",
+    providedInput: {
+      customerEmail: "alice@example.com",
+      secretMemo: "input-secret-memo"
+    }
+  });
+
+  const pack = buildReproducibilityPack({
+    response,
+    capabilities: [invoiceCreateDraft]
+  });
+  const serializedPack = JSON.stringify(pack);
+
+  assert.equal(serializedPack.includes("input-secret-memo"), false);
+  assert.equal(serializedPack.includes("output-secret-token"), false);
+  assert.match(pack.auditTrace.steps[0].inputHash, /^[a-f0-9]{64}$/);
+  assert.match(pack.auditTrace.steps[0].outputHash, /^[a-f0-9]{64}$/);
+});
+
+test("reproducibility pack snapshots capability metadata", async () => {
+  const invoiceSend = createCapability({
+    name: "invoice.send",
+    description: "Send an invoice",
+    version: "1.0.0",
+    inputSchema: z.object({
+      invoiceId: z.string().min(3)
+    }),
+    sideEffect: "external_send",
+    approval: {
+      required: true,
+      reason: "Finance approval is required."
+    },
+    audit: {
+      recordInput: true,
+      recordOutput: false,
+      redaction: ["providerToken"]
+    },
+    idempotency: {
+      required: true,
+      keyFields: ["invoiceId"]
+    },
+    run: ({ invoiceId }) => ({
+      invoiceId,
+      status: "sent"
+    })
+  });
+
+  const { runtime } = createRuntime({
+    capabilities: [invoiceSend],
+    steps: [{ capability: "invoice.send", reason: "Send the invoice" }]
+  });
+  const firstResponse = await runtime.orchestrate({
+    goal: "Send the invoice",
+    providedInput: {
+      invoiceId: "inv_123"
+    }
+  });
+  const response = await runtime.resume({
+    sessionId: firstResponse.sessionId,
+    approved: true
+  });
+
+  const pack = buildReproducibilityPack({
+    response,
+    capabilities: [invoiceSend]
+  });
+  const snapshot = pack.capabilitySnapshots[0];
+
+  assert.equal(snapshot.name, "invoice.send");
+  assert.equal(snapshot.description, "Send an invoice");
+  assert.equal(snapshot.version, "1.0.0");
+  assert.equal(snapshot.sideEffect, "external_send");
+  assert.equal(snapshot.approvalRequired, true);
+  assert.equal(snapshot.approvalReason, "Finance approval is required.");
+  assert.deepEqual(snapshot.audit, {
+    recordInput: true,
+    recordOutput: false,
+    redaction: ["providerToken"]
+  });
+  assert.deepEqual(snapshot.idempotency, {
+    required: true,
+    keyFields: ["invoiceId"]
+  });
+});
+
+test("dry replay does not execute capability run handlers", () => {
+  const invoiceSend = createCapability({
+    name: "invoice.send",
+    description: "Send an invoice",
+    inputSchema: z.object({
+      invoiceId: z.string().min(3)
+    }),
+    sideEffect: "external_send",
+    approval: {
+      required: true
+    },
+    run: () => {
+      throw new Error("capability.run must not be called during dry replay");
+    }
+  });
+  const response = {
+    status: "completed",
+    traceId: "trace_replay",
+    plan: {
+      goal: "Send the invoice",
+      steps: [
+        {
+          capability: "invoice.send",
+          reason: "Send the invoice"
+        }
+      ]
+    },
+    results: [
+      {
+        capability: "invoice.send",
+        input: {
+          invoiceId: "inv_123"
+        },
+        output: {
+          status: "sent"
+        }
+      }
+    ],
+    trace: [
+      {
+        type: "goal.received",
+        message: "Received user goal",
+        goal: "Send the invoice",
+        at: "2026-04-12T00:00:00.000Z"
+      },
+      {
+        type: "plan.created",
+        message: "Generated workflow plan",
+        stepCount: 1,
+        capabilities: ["invoice.send"],
+        at: "2026-04-12T00:00:01.000Z"
+      },
+      {
+        type: "step.entered",
+        message: "Entered invoice.send",
+        capability: "invoice.send",
+        stepIndex: 0,
+        at: "2026-04-12T00:00:02.000Z"
+      },
+      {
+        type: "step.approved",
+        message: "Approved invoice.send",
+        capability: "invoice.send",
+        stepIndex: 0,
+        approvedBy: "user_123",
+        at: "2026-04-12T00:00:03.000Z"
+      },
+      {
+        type: "step.executed",
+        message: "Executed invoice.send",
+        capability: "invoice.send",
+        stepIndex: 0,
+        at: "2026-04-12T00:00:04.000Z"
+      },
+      {
+        type: "step.completed",
+        message: "Completed invoice.send",
+        capability: "invoice.send",
+        stepIndex: 0,
+        at: "2026-04-12T00:00:05.000Z"
+      },
+      {
+        type: "workflow.completed",
+        message: "Workflow completed",
+        resultCount: 1,
+        at: "2026-04-12T00:00:06.000Z"
+      }
+    ]
+  };
+
+  const pack = buildReproducibilityPack({
+    response,
+    capabilities: [invoiceSend]
+  });
+  const auditSummary = replayAuditTrace(pack.auditTrace);
+  const packSummary = replayReproducibilityPack(pack);
+
+  assert.equal(auditSummary.traceId, "trace_replay");
+  assert.equal(auditSummary.stepCount, 1);
+  assert.equal(packSummary.steps[0].capability, "invoice.send");
+});
+
+test("dry replay summarizes rejected approval workflows", async () => {
+  const invoiceSend = createCapability({
+    name: "invoice.send",
+    description: "Send an invoice",
+    inputSchema: z.object({
+      invoiceId: z.string().min(3)
+    }),
+    sideEffect: "external_send",
+    approval: {
+      required: true
+    },
+    run: ({ invoiceId }) => ({
+      invoiceId,
+      status: "sent"
+    })
+  });
+
+  const { runtime } = createRuntime({
+    capabilities: [invoiceSend],
+    steps: [{ capability: "invoice.send", reason: "Send the invoice" }]
+  });
+  const firstResponse = await runtime.orchestrate({
+    goal: "Send the invoice",
+    providedInput: {
+      invoiceId: "inv_123"
+    }
+  });
+  const response = await runtime.resume({
+    sessionId: firstResponse.sessionId,
+    approval: {
+      approved: false,
+      approvedBy: "user_123"
+    }
+  });
+  const auditTrace = buildAuditTrace(response, [invoiceSend]);
+  const summary = replayAuditTrace(auditTrace);
+
+  assert.equal(summary.status, "failed");
+  assert.ok(["rejected", "failed"].includes(summary.steps[0].status));
+  assert.equal(summary.steps[0].approved, false);
+  assert.ok(
+    summary.warnings.some((warning) =>
+      warning.includes("required approval and was rejected by user_123")
+    )
+  );
+});
+
+test("dry replay warns about unknown capability metadata", () => {
+  const response = {
+    status: "failed",
+    traceId: "trace_unknown",
+    plan: {
+      goal: "Send an invoice",
+      steps: [
+        {
+          capability: "invoice.send",
+          reason: "Send the invoice"
+        }
+      ]
+    },
+    results: [],
+    error: "Capability not found",
+    trace: [
+      {
+        type: "goal.received",
+        message: "Received user goal",
+        goal: "Send an invoice",
+        at: "2026-04-12T00:00:00.000Z"
+      },
+      {
+        type: "plan.created",
+        message: "Generated workflow plan",
+        stepCount: 1,
+        capabilities: ["invoice.send"],
+        at: "2026-04-12T00:00:01.000Z"
+      },
+      {
+        type: "step.entered",
+        message: "Entered invoice.send",
+        capability: "invoice.send",
+        stepIndex: 0,
+        at: "2026-04-12T00:00:02.000Z"
+      },
+      {
+        type: "step.failed",
+        message: "Failed invoice.send: Capability not found",
+        capability: "invoice.send",
+        stepIndex: 0,
+        error: "Capability not found",
+        at: "2026-04-12T00:00:03.000Z"
+      }
+    ]
+  };
+
+  const auditTrace = buildAuditTrace(response, []);
+  const summary = replayAuditTrace(auditTrace);
+
+  assert.ok(
+    summary.warnings.some((warning) =>
+      warning.includes("unknown capabilityVersion")
+    )
+  );
+  assert.ok(
+    summary.warnings.some((warning) => warning.includes("unknown sideEffect"))
+  );
 });
 
 test("audit trace respects disabled input and output recording", async () => {

@@ -303,6 +303,26 @@ const auditTrace = buildAuditTrace({
 });
 ```
 
+### Reproducibility Pack
+
+Capora can export a reproducibility pack for a workflow run. The pack includes the audit trace, capability contract snapshots, and stable hashes so a run can be reviewed later without re-executing business capabilities.
+
+The first replay mode is dry replay: it reconstructs the workflow summary from the audit trace and never calls `capability.run`.
+
+```ts
+import {
+  buildReproducibilityPack,
+  replayReproducibilityPack
+} from "@capora/sdk";
+
+const pack = buildReproducibilityPack({
+  response: result,
+  capabilities
+});
+
+const replaySummary = replayReproducibilityPack(pack);
+```
+
 ### Try the demo
 
 The consolidated `demo/` directory contains a standalone web GUI that does not require the monorepo workspace. It uses the published npm packages.
@@ -700,6 +720,26 @@ const auditTrace = buildAuditTrace({
     tenantId: "tenant_abc"
   }
 });
+```
+
+### Reproducibility Pack
+
+Caporaはworkflow runの再現性パッケージをexportできます。Reproducibility Packには、Audit Trace、capability contract snapshot、安定hashが含まれるため、業務capabilityを再実行せずに過去runを後から検証できます。
+
+最初のreplay modeはdry replayです。Audit Traceからworkflow summaryを再構成しますが、`capability.run` は実行しません。
+
+```ts
+import {
+  buildReproducibilityPack,
+  replayReproducibilityPack
+} from "@capora/sdk";
+
+const pack = buildReproducibilityPack({
+  response: result,
+  capabilities
+});
+
+const replaySummary = replayReproducibilityPack(pack);
 ```
 
 ### デモの試し方
